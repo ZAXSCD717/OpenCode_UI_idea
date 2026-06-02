@@ -24,13 +24,14 @@ A JetBrains IDE plugin that integrates [OpenCode](https://opencode.ai) — the o
 
 ### Fork Modifications
 
-This fork migrates the OpenCode terminal and Web UI from **editor file tabs** to a **right-side ToolWindow panel**:
+This fork migrates the OpenCode terminal and Web UI from **editor file tabs** to a **right-side ToolWindow panel**, and fixes the terminal mouse wheel scrolling issue:
 
 | Change | Before (Original) | After (Fork) |
 |--------|-------------------|--------------|
 | **OpenCode Display** | Opens as editor file tabs (e.g., `OpenCode(4096)`) | Opens in right-side ToolWindow panel |
 | **Toggle Behavior** | Close tab to dismiss, re-open via shortcut | Click sidebar icon to show/hide |
 | **Web UI** | Opens as a separate editor tab | Embedded in the same ToolWindow panel (switch via internal CardLayout) |
+| **Terminal Scrolling** | Mouse wheel has no effect on terminal history/output | Wheel events properly forwarded, enabling smooth browsing of command history and output |
 
 ### Feature Comparison with Claude Code
 

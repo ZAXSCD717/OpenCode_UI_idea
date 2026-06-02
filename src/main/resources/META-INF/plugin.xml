@@ -20,6 +20,7 @@
     <b>Fork Modifications:</b><br>
     <ul>
         <li><b>ToolWindow Panel Mode:</b> The OpenCode terminal/Web UI now opens in the right-side ToolWindow panel instead of as editor file tabs. Click the sidebar icon to toggle show/hide.</li>
+        <li><b>Terminal Scroll Wheel Fix:</b> Fixed the mouse wheel scrolling issue that prevented browsing command history and terminal output. The terminal now correctly forwards wheel events (PageUp/PageDown equivalent) for smooth navigation.</li>
     </ul>
     <br>
     <i>Forked by <a href="https://github.com/ZAXSCD717/OpenCode_UI_idea">ZAXSCD717</a>. Original work by <a href="https://github.com/LaiZhou/OpenCode_UI">LaiZhou</a>.</i>
