@@ -2,6 +2,10 @@
 
 [![JetBrains Plugin](https://img.shields.io/badge/JetBrains-Plugin-blue)](https://plugins.jetbrains.com)
 [![OpenCode](https://img.shields.io/badge/OpenCode-AI%20Agent-green)](https://opencode.ai)
+[![Fork](https://img.shields.io/badge/Fork-ZAXSCD717-blueviolet)](https://github.com/ZAXSCD717/OpenCode_UI_idea)
+
+> **Fork Notice**: This is a modified fork of [LaiZhou/OpenCode_UI](https://github.com/LaiZhou/OpenCode_UI).  
+> Original author: **[LaiZhou](https://github.com/LaiZhou)**. Fork maintainer: **[ZAXSCD717](https://github.com/ZAXSCD717)**.
 
 A JetBrains IDE plugin that integrates [OpenCode](https://opencode.ai) — the open-source AI coding agent — directly into your development workflow.
 
@@ -17,6 +21,16 @@ A JetBrains IDE plugin that integrates [OpenCode](https://opencode.ai) — the o
 | **Smart Links** | Clickable file paths in terminal | — | — |
 | **Auth Support** | Optional password for OpenCode server | — | — |
 | **Local Change Alert** | Warn when local edits differ from AI output | — | — |
+
+### Fork Modifications
+
+This fork migrates the OpenCode terminal and Web UI from **editor file tabs** to a **right-side ToolWindow panel**:
+
+| Change | Before (Original) | After (Fork) |
+|--------|-------------------|--------------|
+| **OpenCode Display** | Opens as editor file tabs (e.g., `OpenCode(4096)`) | Opens in right-side ToolWindow panel |
+| **Toggle Behavior** | Close tab to dismiss, re-open via shortcut | Click sidebar icon to show/hide |
+| **Web UI** | Opens as a separate editor tab | Embedded in the same ToolWindow panel (switch via internal CardLayout) |
 
 ### Feature Comparison with Claude Code
 
