@@ -8,6 +8,8 @@ import ai.opencode.ide.jetbrains.session.SessionManager
 import ai.opencode.ide.jetbrains.session.TurnSnapshot
 import ai.opencode.ide.jetbrains.terminal.OpenCodeTerminalFileEditorProvider
 import ai.opencode.ide.jetbrains.terminal.OpenCodeTerminalLinkFilter
+import ai.opencode.ide.jetbrains.terminal.OpenCodeTerminalVirtualFile
+import com.intellij.openapi.fileEditor.FileEditorManager
 import ai.opencode.ide.jetbrains.ui.OpenCodeConnectDialog
 import ai.opencode.ide.jetbrains.util.PathUtil
 import ai.opencode.ide.jetbrains.util.PortFinder
@@ -88,10 +90,13 @@ class OpenCodeService(private val project: Project) : Disposable {
     private var toolWindowPanel: JPanel? = null
     private var terminalWidget: ShellTerminalWidget? = null
     private var webBrowser: JBCefBrowser? = null
+    // Virtual file for the terminal editor tab (original approach — works reliably)
+    private var terminalVirtualFile: ai.opencode.ide.jetbrains.terminal.OpenCodeTerminalVirtualFile? = null
 
     private val connectionListeners = CopyOnWriteArrayList<(Boolean) -> Unit>()
     private var connectionManagerTask: ScheduledFuture<*>? = null
     @Volatile private var lastIdleNotification: Notification? = null
+    @Volatile private var autoConnectAttempted = false
 
     
     // Turn state: keyed by sessionId
@@ -142,8 +147,64 @@ class OpenCodeService(private val project: Project) : Disposable {
             terminalWidget != null -> showContentInToolWindow()
             webBrowser != null -> showContentInToolWindow()
             port != null && isConnected.get() -> restoreUiForMode()
-            // No content yet — show empty panel with hint
-            else -> showCard(CARD_EMPTY)
+            // No content yet — show empty panel with hint and try auto-connect in background
+            else -> {
+                showCard(CARD_EMPTY)
+                tryAutoConnectInBackground()
+            }
+        }
+    }
+
+    /**
+     * Try to detect a running OpenCode server on the default port (4096)
+     * and auto-connect to populate the toolwindow panel.
+     * Only runs once per session to avoid repeated scanning.
+     */
+    private fun tryAutoConnectInBackground() {
+        if (project.isDisposed || autoConnectAttempted) return
+        autoConnectAttempted = true
+        AppExecutorUtil.getAppExecutorService().submit {
+            try {
+                val defaultPort = 4096
+                // Quick TCP check (100ms) before HTTP health check (5s)
+                val tcpOpen = try {
+                    java.net.Socket().use { s ->
+                        s.connect(java.net.InetSocketAddress("127.0.0.1", defaultPort), 100)
+                        true
+                    }
+                } catch (_: Exception) { false }
+                if (!tcpOpen) {
+                    logger.info("[OpenCode] Auto-connect: nothing listening on port $defaultPort")
+                    return@submit
+                }
+                if (!PortFinder.isOpenCodeRunningOnPort(defaultPort)) {
+                    logger.info("[OpenCode] Auto-connect: port $defaultPort is not an OpenCode server")
+                    return@submit
+                }
+
+                val bin = detectOpenCodeBinary()
+                if (bin == null) {
+                    logger.info("[OpenCode] Auto-connect skipped: OpenCode CLI not found")
+                    return@submit
+                }
+
+                val auth = ProcessAuthDetector.detectAuthForPort(defaultPort)
+                ApplicationManager.getApplication().invokeLater {
+                    if (project.isDisposed || hasTerminalUI() || isConnected.get()) return@invokeLater
+                    logger.info("[OpenCode] Auto-connected to running server on port $defaultPort (bin=$bin)")
+                    hostname = "127.0.0.1"
+                    port = defaultPort
+                    username = auth.username
+                    password = auth.password
+                    lastMode = ConnectionMode.TERMINAL
+                    initializeApiClient(hostname, defaultPort)
+                    startConnectionManager()
+                    // Use the established focusOrCreateTerminal path (same as shortcut)
+                    focusOrCreateTerminal(interactive = false)
+                }
+            } catch (e: Exception) {
+                logger.debug("[OpenCode] Auto-connect failed: ${e.message}")
+            }
         }
     }
 
@@ -157,15 +218,18 @@ class OpenCodeService(private val project: Project) : Disposable {
     }
 
     /**
-     * Embed the terminal widget or web browser component into the toolwindow panel.
+     * Focus the terminal or web content.
+     * - Terminal: embed the widget in the ToolWindow panel
+     * - Web: embed the browser in the toolwindow panel
      */
     private fun showContentInToolWindow() {
         val panel = toolWindowPanel ?: return
         panel.removeAll()
         when {
             terminalWidget != null -> {
-                panel.add(terminalWidget!!.component, CARD_TERMINAL)
-                showCard(CARD_TERMINAL)
+                showTerminalInToolWindow(terminalWidget!!)
+                // Request focus so keyboard input reaches the terminal shell
+                terminalWidget!!.preferredFocusableComponent?.requestFocusInWindow()
             }
             webBrowser != null -> {
                 panel.add(webBrowser!!.component, CARD_WEB)
@@ -175,6 +239,57 @@ class OpenCodeService(private val project: Project) : Disposable {
         }
         panel.revalidate()
         panel.repaint()
+    }
+
+    private fun showTerminalInToolWindow(w: ShellTerminalWidget) {
+        val panel = toolWindowPanel ?: return
+        panel.add(w.component, CARD_TERMINAL)
+        showCard(CARD_TERMINAL)
+        panel.revalidate()
+        panel.repaint()
+        logger.warn("[OpenCode] Terminal widget parent=${w.component.parent?.javaClass?.name} panel=${panel.javaClass.name}")
+        // Request focus so keyboard input reaches the terminal shell
+        w.preferredFocusableComponent?.requestFocusInWindow()
+        
+        // Install resize listener for when the ToolWindow panel resizes.
+        // JediTerm needs to know the new size to recalculate columns/rows.
+        // Without this, the terminal content might not render if the initial
+        // layout happens before the ToolWindow has a proper size.
+        if (panel.getComponentListeners().none { it is TerminalResizeListener }) {
+            panel.addComponentListener(TerminalResizeListener(w))
+            logger.warn("[OpenCode] TerminalResizeListener installed")
+        }
+        
+        // Deferred layout: after the ToolWindow is fully laid out, ensure the
+        // terminal widget has a proper size and its rendering pipeline is triggered.
+        // JediTerm's TerminalPanel needs a non-zero size to calculate columns/rows;
+        // without it, TUI output (escape sequences) is processed for 0-width terminal
+        // and displayed as blank.
+        ApplicationManager.getApplication().invokeLater {
+            if (!project.isDisposed && w.component.isShowing) {
+                val size = panel.size
+                logger.warn("[OpenCode] Terminal deferred layout: panel=${size.width}x${size.height} widget=${w.component.size}")
+                if (size.width > 0 && size.height > 0) {
+                    w.component.setSize(size)
+                    w.component.revalidate()
+                    w.component.repaint()
+                } else {
+                    logger.warn("[OpenCode] Terminal deferred layout skipped: panel has zero size")
+                }
+            }
+        }
+    }
+    
+    /** ComponentListener that propagates ToolWindow panel resize to the terminal widget. */
+    private class TerminalResizeListener(private val widget: ShellTerminalWidget) : java.awt.event.ComponentAdapter() {
+        override fun componentResized(e: java.awt.event.ComponentEvent) {
+            val size = e.component.size
+            if (size.width > 0 && size.height > 0) {
+                widget.component.setSize(size)
+                widget.component.revalidate()
+                widget.component.repaint()
+            }
+        }
     }
 
     private fun showCard(card: String) {
@@ -561,9 +676,17 @@ class OpenCodeService(private val project: Project) : Disposable {
         connectionManagerTask?.cancel(true); sseListener?.disconnect(); isConnected.set(false); isConnecting.set(false)
         turnMessageIds.clear(); turnPendingPayloads.clear(); turnSnapshots.clear(); turnIdleWaiting.clear(); turnBarrierTasks.values.forEach { it.cancel(false) }; turnBarrierTasks.clear()
         terminateProcess()
+        // Close the editor tab if open
+        terminalVirtualFile?.let { vf ->
+            if (FileEditorManager.getInstance(project).isFileOpen(vf)) {
+                FileEditorManager.getInstance(project).closeFile(vf)
+            }
+            OpenCodeTerminalFileEditorProvider.unregisterWidget(vf)
+        }
         terminalWidget = null
+        terminalVirtualFile = null
         webBrowser?.let { Disposer.dispose(it) }
-        webBrowser = null; port = null; hostname = "127.0.0.1"; apiClient = null
+        webBrowser = null; port = null; hostname = "127.0.0.1"; apiClient = null; autoConnectAttempted = false
         toolWindowPanel?.removeAll()
         showCard(CARD_EMPTY)
     }
@@ -766,16 +889,50 @@ class OpenCodeService(private val project: Project) : Disposable {
         }
         OpenCodeTerminalLinkFilter.install(project, w)
         
-        // Store the widget reference and embed in the toolwindow panel
+        // Store the widget reference
         terminalWidget = w
-        showContentInToolWindow()
         
-        // Execute opencode command
-        val cmd = command ?: getOpenCodeBinary()
-        w.executeCommand(buildOpenCodeCommand(cmd, h, p, pwd, cont))
+        // Always embed the widget in the ToolWindow panel directly.
+        // DO NOT rely on onToolWindowOpened() to do this — if the ToolWindow is
+        // already visible when this method runs, toolWindow.show() is a no-op
+        // and the event is NOT fired, leaving the widget orphaned.
+        showTerminalInToolWindow(w)
         
-        // Show the toolwindow
+        // Show the toolwindow (no-op if already visible)
         toolWindow?.show()
+        
+        // After showing the toolwindow, schedule focus on the terminal widget
+        // (the focus request in showTerminalInToolWindow happens before show, so it's ignored)
+        ApplicationManager.getApplication().invokeLater {
+            if (!project.isDisposed && terminalWidget != null) {
+                terminalWidget!!.preferredFocusableComponent?.requestFocusInWindow()
+                logger.warn("[OpenCode] Focus requested on terminal widget")
+            }
+        }
+        
+        // Schedule command execution with a delay to let the shell (PowerShell) initialize.
+        // On Windows, the newly created terminal's shell takes time to start up;
+        // sending the command too early (within milliseconds) can result in the shell
+        // not processing it correctly.
+        //
+        // IMPORTANT: Use the full binary path from detectOpenCodeBinary() if available,
+        // rather than just "opencode" from getOpenCodeBinary(). The terminal's shell may
+        // not have opencode in PATH even if the IDE does.
+        val cmd = _cachedBinary ?: command ?: getOpenCodeBinary()
+        val fullCommand = buildOpenCodeCommand(cmd, h, p, pwd, cont)
+        logger.warn("[OpenCode] Will execute command in 2s: $fullCommand")
+        AppExecutorUtil.getAppScheduledExecutorService().schedule({
+            ApplicationManager.getApplication().invokeLater {
+                if (!project.isDisposed) {
+                    logger.warn("[OpenCode] Executing command via executeCommand: $fullCommand")
+                    try {
+                        w.executeCommand(fullCommand)
+                    } catch (e: Exception) {
+                        logger.warn("[OpenCode] executeCommand failed: ${e.message}", e)
+                    }
+                }
+            }
+        }, 2000, TimeUnit.MILLISECONDS)
     }
 
 
@@ -783,23 +940,34 @@ class OpenCodeService(private val project: Project) : Disposable {
     private fun buildOpenCodeCommand(command: String, h: String, p: Int, pwd: String?, cont: Boolean): String {
         // Quote command if it contains spaces (e.g. absolute path on Windows)
         val cmdSafe = if (command.contains(" ")) "\"$command\"" else command
-        val base = "$cmdSafe --hostname $h --port $p${if (cont) " --continue" else ""}"
+        // NOTE: --hostname and --port were removed from the base `opencode` command
+        // in opencode v1.15+. They are only valid for subcommands (web, serve).
+        // Running `opencode` without flags starts the TUI on default port 4096,
+        // which is what we need. The API client connects to 127.0.0.1:4096.
+        val base = "$cmdSafe${if (cont) " --continue" else ""}"
         if (pwd.isNullOrBlank()) return base
         return if (isWindows()) "cmd /c \"set \"OPENCODE_SERVER_PASSWORD=${pwd.replace("\"", "\\\"")}\" && $base\"" else "OPENCODE_SERVER_PASSWORD='${pwd.replace("'", "'\\''")}' $base"
     }
 
     @Volatile private var _cachedBinary: String? = null
 
+    /** Resolve opencode binary path (safe for EDT - no process execution).
+     *  Checks common installation dirs; returns full path or "opencode" as last resort. */
     private fun getOpenCodeBinary(): String {
         _cachedBinary?.let { return it }
 
-        // Fast check common paths (safe for EDT - no process execution)
         val home = System.getProperty("user.home")
+        val appData = System.getenv("APPDATA") // e.g. C:\Users\Lenovo\AppData\Roaming
+        val localAppData = System.getenv("LOCALAPPDATA")
+
         val candidates = if (isWindows()) {
-            listOf(
+            listOfNotNull(
                 java.io.File(home, ".opencode/bin/opencode.exe"),
                 java.io.File("C:\\Program Files\\opencode\\opencode.exe"),
-                java.io.File(System.getenv("LOCALAPPDATA") ?: "", "opencode\\opencode.exe"),
+                localAppData?.let { java.io.File(it, "opencode\\opencode.exe") },
+                // npm global install: npm puts a .cmd wrapper at %APPDATA%\npm\opencode
+                appData?.let { java.io.File(it, "npm\\opencode") },
+                appData?.let { java.io.File(it, "npm\\opencode.cmd") },
             )
         } else {
             listOf(
@@ -822,21 +990,28 @@ class OpenCodeService(private val project: Project) : Disposable {
             }
         }
 
+        // NOTE: This method is called from EDT. Do NOT run processes here.
+        // `where`/`which` discovery is done in detectOpenCodeBinary() (background thread).
+
         return "opencode"
     }
 
     /** Detect OpenCode binary path (Background thread safe) */
     private fun detectOpenCodeBinary(): String? {
         val home = System.getProperty("user.home")
-        val exe = if (isWindows()) ".exe" else ""
+        val appData = System.getenv("APPDATA")
+        val localAppData = System.getenv("LOCALAPPDATA")
         
         // Check common installation paths (ordered by priority)
         val candidates = if (isWindows()) {
-            listOf(
+            listOfNotNull(
                 java.io.File(home, ".opencode/bin/opencode.exe"),
                 java.io.File("C:\\Program Files\\opencode\\opencode.exe"),
                 java.io.File("C:\\Program Files (x86)\\opencode\\opencode.exe"),
-                java.io.File(System.getenv("LOCALAPPDATA") ?: "", "opencode\\opencode.exe"),
+                localAppData?.let { java.io.File(it, "opencode\\opencode.exe") },
+                // npm global install: npm puts a .cmd wrapper at %APPDATA%\npm\opencode
+                appData?.let { java.io.File(it, "npm\\opencode") },
+                appData?.let { java.io.File(it, "npm\\opencode.cmd") },
             )
         } else {
             listOf(
@@ -861,6 +1036,51 @@ class OpenCodeService(private val project: Project) : Disposable {
         // Fallback: Check PATH (may fail in sandboxed environments like Snap)
         if (checkOpenCodeCliAvailable()) {
             logger.info("[OpenCode] CLI detected in PATH")
+            // Try to get the full path via `where` / `which` (background-thread safe)
+            try {
+                val cmd = if (isWindows()) listOf("cmd", "/c", "where", "opencode")
+                          else listOf("which", "opencode")
+                val result = CapturingProcessHandler(GeneralCommandLine(cmd)).runProcess(5000)
+                if (result.exitCode == 0) {
+                    val lines = result.stdout.trim().lines().filter { it.isNotBlank() }
+                    val resolvedPath = if (isWindows()) {
+                        // On Windows, `where` returns extensionless files first (e.g. NVM's
+                        // nodejs\opencode without .cmd). These are Node.js shebang scripts that
+                        // Windows/PowerShell cannot execute directly — they cause a blank CMD
+                        // console to open as Windows's "how to open" fallback.
+                        // Prefer .cmd, .exe, .bat files which Windows knows how to run.
+                        val preferred = lines.firstOrNull { line ->
+                            line.endsWith(".cmd", ignoreCase = true) ||
+                            line.endsWith(".exe", ignoreCase = true) ||
+                            line.endsWith(".bat", ignoreCase = true)
+                        }
+                        if (preferred != null) {
+                            logger.info("[OpenCode] Resolved CLI path (preferred Windows extension): $preferred")
+                            preferred
+                        } else {
+                            // No .cmd/.exe/.bat found — try .js or fall back
+                            val jsOrNone = lines.firstOrNull { line ->
+                                line.endsWith(".js", ignoreCase = true)
+                            } ?: lines.firstOrNull()
+                            if (jsOrNone != null && !jsOrNone.endsWith(".js", ignoreCase = true) &&
+                                !jsOrNone.any { c -> c == '.' && c != ':' && c != '\\' }) {
+                                // Extensionless file — can't execute on Windows. Use just "opencode".
+                                logger.warn("[OpenCode] `where` returned extensionless path: $jsOrNone. Using plain 'opencode' instead.")
+                                "opencode"
+                            } else {
+                                jsOrNone
+                            }
+                        }
+                    } else {
+                        lines.firstOrNull()
+                    }
+                    if (!resolvedPath.isNullOrBlank()) {
+                        _cachedBinary = resolvedPath
+                        return resolvedPath
+                    }
+                }
+            } catch (_: Exception) { }
+            // Fall back to plain name if we can't resolve the full path
             _cachedBinary = "opencode"
             return "opencode"
         }
@@ -914,14 +1134,31 @@ class OpenCodeService(private val project: Project) : Disposable {
         if (terminalWidget != null) {
             focusTerminalUI()
         } else {
-            // Terminal UI doesn't exist, need to create new terminal and start opencode
-            try {
-                createTerminalUIInternal(hostname, port ?: return, password, false)
-            } catch (e: Exception) {
-                logger.warn("[OpenCode] Failed to create terminal UI", e)
-                ApplicationManager.getApplication().invokeLater {
-                    Messages.showErrorDialog(project, "Failed to create terminal: ${e.message}", "OpenCode")
+            // If we don't have a cached binary yet, run detection on background thread first,
+            // then create terminal UI on EDT with the detected path.
+            if (_cachedBinary == null) {
+                AppExecutorUtil.getAppExecutorService().submit {
+                    detectOpenCodeBinary()
+                    ApplicationManager.getApplication().invokeLater {
+                        if (!project.isDisposed) {
+                            doCreateTerminalUi()
+                        }
+                    }
                 }
+            } else {
+                doCreateTerminalUi()
+            }
+        }
+    }
+
+    /** Create the terminal widget and run opencode. Called on EDT. */
+    private fun doCreateTerminalUi() {
+        try {
+            createTerminalUIInternal(hostname, port ?: return, password, false)
+        } catch (e: Exception) {
+            logger.warn("[OpenCode] Failed to create terminal UI", e)
+            ApplicationManager.getApplication().invokeLater {
+                Messages.showErrorDialog(project, "Failed to create terminal: ${e.message}", "OpenCode")
             }
         }
     }
