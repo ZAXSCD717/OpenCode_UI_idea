@@ -1,5 +1,8 @@
 package ai.opencode.ide.jetbrains
 
+import com.intellij.icons.AllIcons
+import com.intellij.openapi.actionSystem.AnAction
+import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
@@ -40,6 +43,15 @@ class OpenCodeToolWindowFactory : ToolWindowFactory {
 
         // Register references in service for content population
         service.attachToolWindow(panel, toolWindow)
+
+        // Add reconnect button in the toolwindow title bar
+        toolWindow.setTitleActions(listOf(
+            object : AnAction("Reconnect", "Disconnect and restart OpenCode", AllIcons.Actions.Refresh) {
+                override fun actionPerformed(e: AnActionEvent) {
+                    service.reconnect()
+                }
+            }
+        ))
 
         // Listen for show events and state changes to manage content lifecycle.
         // Use stateChanged() to detect hide (check isVisible inside).

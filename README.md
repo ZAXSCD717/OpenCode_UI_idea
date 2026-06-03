@@ -1,175 +1,174 @@
-# OpenCode JetBrains Plugin
+# OpenCode JetBrains 插件
 
 [![JetBrains Plugin](https://img.shields.io/badge/JetBrains-Plugin-blue)](https://plugins.jetbrains.com)
 [![OpenCode](https://img.shields.io/badge/OpenCode-AI%20Agent-green)](https://opencode.ai)
 [![Fork](https://img.shields.io/badge/Fork-ZAXSCD717-blueviolet)](https://github.com/ZAXSCD717/OpenCode_UI_idea)
 
-> **Fork Notice**: This is a modified fork of [LaiZhou/OpenCode_UI](https://github.com/LaiZhou/OpenCode_UI).  
-> Original author: **[LaiZhou](https://github.com/LaiZhou)**. Fork maintainer: **[ZAXSCD717](https://github.com/ZAXSCD717)**.
+> **分支说明**: 本仓库基于 [LaiZhou/OpenCode_UI](https://github.com/LaiZhou/OpenCode_UI) 修改。  
+> 原作者: **[LaiZhou](https://github.com/LaiZhou)**。分支维护者: **[ZAXSCD717](https://github.com/ZAXSCD717)**。
 
-A JetBrains IDE plugin that integrates [OpenCode](https://opencode.ai) — the open-source AI coding agent — directly into your development workflow.
+将 [OpenCode](https://opencode.ai) — 开源 AI 编码代理 — 直接集成到 JetBrains IDE 中。
 
-## Features
+## 功能
 
-| Feature | Description | Shortcut (Mac) | Shortcut (Win/Linux) |
+| 功能 | 说明 | 快捷键 (Mac) | 快捷键 (Win/Linux) |
 |---------|-------------|----------------|----------------------|
-| **Quick Launch** | Connect to existing OpenCode server or create new terminal | `Cmd + Esc` | `Ctrl + \` |
-| **Add to Terminal** | Send current file/selection or selected files to OpenCode | `Opt + Cmd + K` | `Ctrl + Alt + K` |
-| **Diff Review** | View diffs and accept/reject changes in IDE | — | — |
-| **Notifications** | System alert when task completes | — | — |
-| **Auto-Resume** | Restore last session on launch | — | — |
-| **Smart Links** | Clickable file paths in terminal | — | — |
-| **Auth Support** | Optional password for OpenCode server | — | — |
-| **Local Change Alert** | Warn when local edits differ from AI output | — | — |
+| **快速启动** | 连接已有 OpenCode 服务或创建新终端 | `Cmd + Esc` | `Ctrl + \` |
+| **添加上下文** | 将当前文件/选中内容发送给 AI | `Opt + Cmd + K` | `Ctrl + Alt + K` |
+| **差异对比** | 在 IDE 中审查差异并接受/拒绝更改 | — | — |
+| **通知提醒** | 任务完成时系统通知 | — | — |
+| **自动恢复** | 启动时恢复上次会话 | — | — |
+| **智能链接** | 终端中可点击的文件路径 | — | — |
+| **认证支持** | OpenCode 服务器可选密码 | — | — |
+| **本地变更提醒** | 本地编辑与 AI 输出不一致时警告 | — | — |
 
-### Fork Modifications
+### 分支修改
 
-This fork migrates the OpenCode terminal and Web UI from **editor file tabs** to a **right-side ToolWindow panel**, and fixes the terminal mouse wheel scrolling issue:
+本分支将 OpenCode 终端和 Web UI 从**编辑器文件选项卡**迁移到**右侧 ToolWindow 面板**，并修复了终端鼠标滚轮滚动问题：
 
-| Change | Before (Original) | After (Fork) |
+| 变更 | 修改前 (原版) | 修改后 (本分支) |
 |--------|-------------------|--------------|
-| **OpenCode Display** | Opens as editor file tabs (e.g., `OpenCode(4096)`) | Opens in right-side ToolWindow panel |
-| **Toggle Behavior** | Close tab to dismiss, re-open via shortcut | Click sidebar icon to show/hide |
-| **Web UI** | Opens as a separate editor tab | Embedded in the same ToolWindow panel (switch via internal CardLayout) |
-| **Terminal Scrolling** | Mouse wheel has no effect on terminal history/output | Wheel events properly forwarded, enabling smooth browsing of command history and output |
+| **OpenCode 显示** | 以编辑器选项卡打开（如 `OpenCode(4096)`） | 在右侧 ToolWindow 面板中打开 |
+| **切换行为** | 关闭选项卡取消，重新打开需按快捷键 | 点击侧栏图标显示/隐藏 |
+| **Web UI** | 作为独立编辑器选项卡打开 | 嵌入同一 ToolWindow 面板（通过内部 CardLayout 切换） |
+| **终端滚动** | 鼠标滚轮对终端历史/输出无效 | 滚轮事件正确转发，可流畅浏览命令历史 |
+| **文件引用** | 通过 HTTP API 发送文件引用 | 直接写入终端 TTY，兼容 opencode v1.15+ |
 
-### Feature Comparison with Claude Code
+### 与 Claude Code 功能对比
 
-| Feature | Claude Code | OpenCode |
+| 功能 | Claude Code | OpenCode |
 |---------|-------------|----------|
-| Quick Launch | ✅ | ✅ |
-| Diff Viewing | ✅ | ✅ |
-| File Reference Shortcuts | ✅ | ✅ |
-| Diagnostic Sharing | ✅ | ❌ (uses built-in LSP) |
+| 快速启动 | ✅ | ✅ |
+| 差异查看 | ✅ | ✅ |
+| 文件引用快捷键 | ✅ | ✅ |
+| 诊断共享 | ✅ | ❌ (使用内置 LSP) |
 
-### Sidebar Icon
+### 侧栏图标
 
-Click the **OpenCode** icon in the right sidebar to instantly focus or create an OpenCode terminal session.
+点击右侧边栏的 **OpenCode** 图标即可快速聚焦或创建 OpenCode 终端会话。
 
-### Context Menus
+### 右键菜单
 
-- **Editor**: Right-click in editor → *OpenCode: Add Context*
-- **Project View**: Right-click on files/folders → *OpenCode: Add File(s)*
+- **编辑器**: 右键 → *OpenCode: 添加上下文*
+- **项目视图**: 右键 → *OpenCode: 添加文件*
 
-## Requirements
+## 系统要求
 
-- **JetBrains IDE**: IntelliJ IDEA, WebStorm, PyCharm, etc. (2025.2+)
-- **OpenCode CLI**: Install via `npm install -g opencode` or see [opencode.ai/download](https://opencode.ai/download)
+- **JetBrains IDE**: IntelliJ IDEA、WebStorm、PyCharm 等 (2025.2+)
+- **OpenCode CLI**: 通过 `npm install -g opencode` 安装，或访问 [opencode.ai/download](https://opencode.ai/download)
 
-## Installation
+## 安装
 
-**Plugin URL**: https://plugins.jetbrains.com/plugin/29744-opencode-ui
+**插件地址**: https://plugins.jetbrains.com/plugin/29744-opencode-ui
 
-Open **Settings** → **Plugins** → **Marketplace** → Search "OpenCode" → **Install**
+打开 **设置** → **插件** → **市场** → 搜索 "OpenCode" → **安装**
 
-## Usage
+## 使用方法
 
-### 1. Launch OpenCode Terminal
+### 1. 启动 OpenCode 终端
 
-Press `Cmd+Esc` (Mac) or `Ctrl+\` (Win/Linux) to open the connection dialog. You can:
+按 `Ctrl+\` (Win/Linux) 或 `Cmd+Esc` (Mac) 打开连接对话框。您可以：
 
-- **Connect to existing server**: Enter `host:port` (e.g., `127.0.0.1:58052`) and optional password to connect to OpenCode Desktop or any running OpenCode server. Authentication is detected automatically if available.
-- **Create new terminal**: Use default `127.0.0.1:4096` to create a local OpenCode terminal session. The terminal tab will be named `OpenCode(4096)`.
+- **连接已有服务器**: 输入 `host:port`（如 `127.0.0.1:58052`）和可选密码，连接到 OpenCode Desktop 或任何正在运行的 OpenCode 服务器。认证自动检测。
+- **创建新终端**: 使用默认 `127.0.0.1:4096` 创建本地 OpenCode 终端会话。
 
-*Your last connection settings (address, mode, password) are remembered automatically.*
+*上次连接的设置（地址、模式、密码）会自动保存。*
 
-![Step 1: Launch OpenCode](images/1.png)
+![步骤 1: 启动 OpenCode](images/1.png)
 
-### 2. Send Code Context to OpenCode
+### 2. 向 OpenCode 发送代码上下文
 
-In the editor or Project View, press `Opt+Cmd+K` (Mac) or `Ctrl+Alt+K` (Win/Linux).
+在编辑器或项目视图中，按 `Ctrl+Alt+K` (Win/Linux) 或 `Opt+Cmd+K` (Mac)。
 
-- If the OpenCode terminal is not open yet, the plugin creates/focuses it automatically.
-- In the editor, it shares the **current file** even if nothing is selected.
+- 如果 OpenCode 终端尚未打开，插件会自动创建/聚焦它。
+- 在编辑器中，即使未选中任何内容也会共享**当前文件**。
 
-![Step 2: Selection](images/2.png)
+![步骤 2: 选中内容](images/2.png)
 
-The plugin will send:
+插件会发送：
 
-- **Editor selection**: `@path/to/file.kt#L10-25`
-- **Editor (no selection)**: `@path/to/file.kt`
-- **Project View selection**: `@path/to/file.kt` for each selected file
+- **编辑器选中**: `@path/to/file.kt#L10-25`
+- **编辑器（未选中）**: `@path/to/file.kt`
+- **项目视图选中**: 每个选中的文件 `@path/to/file.kt`
 
-![Step 3: Result in Terminal](images/3.png)
+![步骤 3: 终端结果](images/3.png)
 
-This allows OpenCode to understand the context of your question or request.
+### 3. 侧栏按钮
 
-### 3. Sidebar Button
+点击右侧边栏的 OpenCode 图标，快速聚焦或创建 OpenCode 终端。
 
-Click the OpenCode icon in the right sidebar to quickly focus or create the OpenCode terminal.
+![步骤 4: 侧栏按钮](images/4.png)
 
-![Step 4: Sidebar Button](images/4.png)
+### 4. 审查差异
 
-### 4. Review Diffs
+当 OpenCode 修改文件时，插件会打开原生 IDE 差异对比器。
 
-When OpenCode edits files, the plugin opens a native IDE diff viewer.
+- **按时间顺序查看**: 按修改顺序显示变更，从第一个修改的文件开始。
+- **导航**: 使用 **← →** 箭头切换文件，**↑ ↓** 箭头在不同变更之间跳转。
+- **触发**: OpenCode 完成响应（会话空闲）时自动打开差异对比器。
+- **进度**: 标题显示审查进度（如 `1/5`）。
+- **接受**: 将 AI 的更改写入磁盘并暂存文件（git add）。自动打开下一个文件。
+- **拒绝**: 将文件恢复到 AI 开始编辑前的状态。自动打开下一个文件。
+- **本地修改**: 当您的文件与 AI 输出不一致时，差异标题会显示`（已本地修改）`。
 
-- **Chronological View**: Changes are shown in the order they were made, starting from the first modified file.
-- **Navigation**: Use **← →** arrows to switch files and **↑ ↓** arrows to jump between changes.
-- **Trigger**: The diff viewer opens automatically when OpenCode finishes a response (session idle).
-- **Progress**: The title shows your review progress (e.g., `1 of 5`) for multi-file changes.
-- **Accept**: Writes the AI's changes to disk and stages the file (git add). Automatically opens the next file.
-- **Reject**: Restores the file to its state before the AI started editing. Automatically opens the next file.
-- **Local Modified**: The diff title shows `(Local Modified)` when your file differs from AI output.
+![差异对比 - 接受](images/5.png)
+![差异对比 - 拒绝](images/6.png)
 
-![Diff Viewer - Accept](images/5.png)
-![Diff Viewer - Reject](images/6.png)
+### 5. 任务通知
 
-### 5. Task Notifications
+当 OpenCode 完成任务（从忙碌转为空闲）时，插件会发送系统通知。这样您可以在 AI 生成代码时切换到其他工作，并在任务完成后立即收到通知。
 
-The plugin sends a system notification when OpenCode finishes a task (transitions from Busy to Idle). This allows you to switch to other work while the AI is generating code, and be notified immediately when it's done.
+> **提示**: 要接收桌面通知，请确保操作系统允许 JetBrains IDE 发送通知（例如 macOS：*系统设置 > 通知 > IntelliJ IDEA*）。
 
-> **Tip**: To receive desktop notifications, please ensure your operating system allows notifications for the JetBrains IDE (e.g., on macOS: *System Settings > Notifications > IntelliJ IDEA*).
+### 6. 智能文件链接
 
-### 6. Smart File Links
+终端输出中的文件路径（如 `@src/main/kotlin/Main.kt#L10-20`）是可点击的。点击可在编辑器中打开该文件并高亮显示引用的行。
 
-File paths in the terminal output (e.g., `@src/main/kotlin/Main.kt#L10-20`) are clickable. Clicking them opens the file in the editor and highlights the referenced lines.
+## 键盘快捷键
 
-## Keyboard Shortcuts
+所有快捷键均可通过 **设置** → **键位图** → 搜索 "OpenCode" 自定义。
 
-All shortcuts are customizable via **Settings** → **Keymap** → search for "OpenCode".
-
-| Action | Mac | Windows/Linux |
+| 操作 | Mac | Windows/Linux |
 |--------|-----|---------------|
-| Open/Focus OpenCode | `Cmd + Esc` | `Ctrl + \` |
-| Add to OpenCode Terminal | `Opt + Cmd + K` | `Ctrl + Alt + K` |
+| 打开/聚焦 OpenCode | `Cmd + Esc` | `Ctrl + \` |
+| 发送到 OpenCode 终端 | `Opt + Cmd + K` | `Ctrl + Alt + K` |
 
-## Terminal Management
+## 终端管理
 
-The plugin uses a single terminal tab per project named **"OpenCode({port})"**.
+每个项目使用一个名为 **"OpenCode({port})"** 的终端。
 
-- Only one OpenCode terminal session per project
-- The terminal persists across plugin actions
-- Closing the terminal tab will create a new one on next launch
+- 每个项目只有一个 OpenCode 终端会话
+- 终端在插件操作之间持续存在
+- 关闭终端选项卡后，下次启动会自动创建新终端
 
-## Troubleshooting
+## 常见问题
 
 ### "opencode: command not found"
 
-Install the OpenCode CLI:
+安装 OpenCode CLI：
 
 ```bash
 npm install -g opencode-ai
 ```
 
-Or download from [opencode.ai/download](https://opencode.ai/download)
+或从 [opencode.ai/download](https://opencode.ai/download) 下载
 
-### Terminal not responding
+### 终端无响应
 
-Try closing the "OpenCode({port})" terminal tab and pressing `Cmd+Esc` or `Ctrl+\` again to create a fresh session.
+尝试关闭 "OpenCode({port})" 终端选项卡，然后按 `Ctrl+\` 或 `Cmd+Esc` 重新创建新会话。
 
-### Shortcuts not working
+### 快捷键不工作
 
-1. Check for conflicts in **Settings** → **Keymap**
-2. Search for your shortcut to see if it's assigned to another action
-3. Reassign or remove conflicting shortcuts
+1. 在 **设置** → **键位图** 中检查冲突
+2. 搜索快捷键以查看是否绑定到了其他操作
+3. 重新分配或删除冲突的快捷键
 
-## Support
+## 支持
 
-- [OpenCode Documentation](https://opencode.ai/docs)
+- [OpenCode 文档](https://opencode.ai/docs)
 - [GitHub Issues](https://github.com/anomalyco/opencode/issues)
-- [Discord Community](https://opencode.ai/discord)
+- [Discord 社区](https://opencode.ai/discord)
 
-## License
+## 许可证
 
-MIT License. See [LICENSE](LICENSE) for details.
+MIT License。详见 [LICENSE](LICENSE)。

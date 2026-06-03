@@ -147,10 +147,25 @@ class OpenCodeService(private val project: Project) : Disposable {
             terminalWidget != null -> showContentInToolWindow()
             webBrowser != null -> showContentInToolWindow()
             port != null && isConnected.get() -> restoreUiForMode()
-            // No content yet — show empty panel with hint and try auto-connect in background
+            // No content yet — quick TCP check to decide: auto-connect to existing server
+            // or auto-start a new terminal session.
             else -> {
-                showCard(CARD_EMPTY)
-                tryAutoConnectInBackground()
+                val checkPort = port ?: 4096
+                val tcpOpen = try {
+                    java.net.Socket().use { s ->
+                        s.connect(java.net.InetSocketAddress("127.0.0.1", checkPort), 100)
+                        true
+                    }
+                } catch (_: Exception) { false }
+                if (tcpOpen) {
+                    // Something is listening — try to auto-connect as OpenCode server
+                    showCard(CARD_EMPTY)
+                    tryAutoConnectInBackground()
+                } else {
+                    // Nothing running — full startup via createLocalTerminal (includes API client + connection manager)
+                    if (port == null) port = 4096
+                    createLocalTerminal(hostname, port!!, password)
+                }
             }
         }
     }
@@ -348,6 +363,7 @@ class OpenCodeService(private val project: Project) : Disposable {
 
     fun pasteToTerminal(text: String): Boolean {
         if (text.isBlank()) return false
+        // Prefer API client if available (older opencode with HTTP server)
         apiClient?.let { client -> 
             AppExecutorUtil.getAppExecutorService().submit { 
                 try { 
@@ -357,6 +373,23 @@ class OpenCodeService(private val project: Project) : Disposable {
                 } 
             }
             return true 
+        }
+        // Fallback: write directly to the terminal widget's TTY (opencode v1.15+ TUI mode)
+        val widget = terminalWidget
+        if (widget != null) {
+            AppExecutorUtil.getAppExecutorService().submit {
+                try {
+                    val connector = widget.ttyConnector
+                    if (connector != null) {
+                        connector.write(text)
+                        connector.write("\n")
+                        logger.warn("[Paste] Written to TTY connector: $text")
+                    }
+                } catch (e: Exception) {
+                    logger.warn("[Paste] TTY write error: ${e.message}")
+                }
+            }
+            return true
         }
         return false
     }
@@ -919,7 +952,7 @@ class OpenCodeService(private val project: Project) : Disposable {
         // rather than just "opencode" from getOpenCodeBinary(). The terminal's shell may
         // not have opencode in PATH even if the IDE does.
         val cmd = _cachedBinary ?: command ?: getOpenCodeBinary()
-        val fullCommand = buildOpenCodeCommand(cmd, h, p, pwd, cont)
+        val fullCommand = buildOpenCodeCommand(cmd, h, p, pwd)
         logger.warn("[OpenCode] Will execute command in 2s: $fullCommand")
         AppExecutorUtil.getAppScheduledExecutorService().schedule({
             ApplicationManager.getApplication().invokeLater {
@@ -937,14 +970,15 @@ class OpenCodeService(private val project: Project) : Disposable {
 
 
 
-    private fun buildOpenCodeCommand(command: String, h: String, p: Int, pwd: String?, cont: Boolean): String {
+    private fun buildOpenCodeCommand(command: String, h: String, p: Int, pwd: String?): String {
         // Quote command if it contains spaces (e.g. absolute path on Windows)
         val cmdSafe = if (command.contains(" ")) "\"$command\"" else command
-        // NOTE: --hostname and --port were removed from the base `opencode` command
-        // in opencode v1.15+. They are only valid for subcommands (web, serve).
-        // Running `opencode` without flags starts the TUI on default port 4096,
-        // which is what we need. The API client connects to 127.0.0.1:4096.
-        val base = "$cmdSafe${if (cont) " --continue" else ""}"
+        // NOTE: In opencode v1.15+, --hostname, --port, and --continue are NOT valid
+        // flags for the base `opencode` command. They only work on subcommands
+        // (web, serve, continue).
+        // Running `opencode` without flags starts the TUI on default port 4096.
+        // The API client connects to 127.0.0.1:4096.
+        val base = cmdSafe
         if (pwd.isNullOrBlank()) return base
         return if (isWindows()) "cmd /c \"set \"OPENCODE_SERVER_PASSWORD=${pwd.replace("\"", "\\\"")}\" && $base\"" else "OPENCODE_SERVER_PASSWORD='${pwd.replace("'", "'\\''")}' $base"
     }
@@ -1112,6 +1146,20 @@ class OpenCodeService(private val project: Project) : Disposable {
     }
 
     private fun isWindows() = System.getProperty("os.name", "").lowercase().contains("windows")
+
+    /** Public API — disconnect and restart the current session */
+    fun reconnect() {
+        val m = lastMode
+        val h = hostname; val p = port ?: return; val pwd = password
+        disconnectAndReset()
+        hostname = h; port = p; password = pwd; lastMode = m
+        when (m) {
+            ConnectionMode.WEB -> createWebTerminal(h, p, pwd)
+            ConnectionMode.REMOTE -> connectToExistingServer(h, p, ProcessAuthDetector.ServerAuth("opencode", pwd), false, false)
+            else -> createLocalTerminal(h, p, pwd)
+        }
+    }
+
     private fun restartServer(m: ConnectionMode) { 
         val h = hostname; val p = port ?: return; val pwd = password; disconnectAndReset(); hostname = h; port = p; password = pwd; lastMode = m; 
         if (m == ConnectionMode.WEB) createWebTerminal(h, p, pwd) 

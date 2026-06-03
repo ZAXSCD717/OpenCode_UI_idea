@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "ai.opencode"
-version = "1.1.0"
+version = "1.4.0"
 
 repositories {
     maven { url = uri("https://maven.aliyun.com/repository/public") }
@@ -44,6 +44,22 @@ intellijPlatform {
         }
 
         changeNotes = """
+            <h2>1.4.0</h2>
+            <ul>
+                <li>Fix: Ctrl+Alt+K file reference now works with opencode v1.15+ TUI mode. Added fallback to write text directly to terminal TTY when HTTP API is unavailable (opencode v1.15+ no longer starts an HTTP server by default).</li>
+                <li>Fix: Removed invalid --continue flag from the base <code>opencode</code> command alongside --hostname/--port.</li>
+                <li>New: Reconnect button (↻) in ToolWindow title bar for quick restart.</li>
+            </ul>
+            <h2>1.3.0</h2>
+            <ul>
+                <li>Fix: ToolWindow icon click now auto-starts a terminal session instead of showing an empty panel. Quick TCP check decides whether to connect to an existing server or start a new one.</li>
+            </ul>
+            <h2>1.2.0</h2>
+            <ul>
+                <li>New: ToolWindow Panel Mode — The OpenCode terminal and Web UI now open in a right-side ToolWindow panel instead of as editor file tabs. Click the sidebar icon to toggle show/hide.</li>
+                <li>New: Terminal Scroll Wheel Fix — Fixed mouse wheel scrolling for browsing command history and terminal output. Wheel events (PageUp/PageDown) are now properly forwarded to the terminal.</li>
+                <li>Fix: Removed invalid --hostname/--port flags from the base <code>opencode</code> command, which caused the TUI to exit immediately on opencode v1.15+.</li>
+            </ul>
             <h2>1.1.0</h2>
             <ul>
                 <li>New: Custom base path support — added a "Custom base path" dropdown in the connection dialog, allowing users to specify a working directory for OpenCode terminal sessions. Automatically populated with detected project modules.</li>

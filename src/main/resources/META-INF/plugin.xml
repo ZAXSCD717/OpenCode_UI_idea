@@ -2,28 +2,29 @@
 <idea-plugin>
   <id>ai.opencode.ide.jetbrains</id>
   <name>OpenCode UI</name>
-  <vendor email="hhlai1990@gmail.com" url="https://github.com/LaiZhou/OpenCode_UI">laizhou (Original Author)</vendor>
+  <vendor email="" url="https://github.com/ZAXSCD717/OpenCode_UI_idea">ZAXSCD717</vendor>
   
 
   <description><![CDATA[
-    <b>OpenCode UI - AI Coding Agent for JetBrains IDEs</b><br><br>
+    <b>OpenCode UI - JetBrains IDE 插件</b><br><br>
     
-    Seamlessly integrates <a href="https://opencode.ai">OpenCode</a> directly into your workflow.<br><br>
+    将 <a href="https://opencode.ai">OpenCode</a> 直接集成到您的 IDE 工作流中。<br><br>
     
-    <b>Key Features:</b><br>
+    <b>主要功能:</b><br>
     <ul>
-        <li><b>Quick Launch:</b> Connect to existing OpenCode server (e.g., OpenCode Desktop) or create new terminal with <code>Cmd+Esc</code> / <code>Ctrl+\</code>. Supports automatic authentication and optional password input.</li>
-        <li><b>Context Sharing:</b> Send current file, selection, or Project View items to the agent with <code>Opt+Cmd+K</code> / <code>Ctrl+Alt+K</code>.</li>
-        <li><b>Native Diff Review:</b> Review AI-generated changes in a multi-file diff viewer. Accept stages changes (<code>git add</code>), Reject restores original content. Automatic snapshots ensure you can always recover previous versions.</li>
+        <li><b>快速启动:</b> 使用 <code>Ctrl+\</code> 连接已有 OpenCode 服务或创建新终端，支持自动认证和密码输入。</li>
+        <li><b>上下文分享:</b> 使用 <code>Ctrl+Alt+K</code> 将当前文件、选中代码或项目视图中的文件发送给 AI 代理。</li>
+        <li><b>原生差异对比:</b> 在多文件差异对比器中审查 AI 生成的变化。接受时执行 <code>git add</code> 暂存更改，拒绝则恢复原始内容。自动快照确保您可以随时恢复之前的版本。</li>
     </ul>
     <br>
-    <b>Fork Modifications:</b><br>
+    <b>分支修改:</b><br>
     <ul>
-        <li><b>ToolWindow Panel Mode:</b> The OpenCode terminal/Web UI now opens in the right-side ToolWindow panel instead of as editor file tabs. Click the sidebar icon to toggle show/hide.</li>
-        <li><b>Terminal Scroll Wheel Fix:</b> Fixed the mouse wheel scrolling issue that prevented browsing command history and terminal output. The terminal now correctly forwards wheel events (PageUp/PageDown equivalent) for smooth navigation.</li>
+        <li><b>ToolWindow 面板模式:</b> OpenCode 终端和 Web 界面现在显示在右侧 ToolWindow 面板中，而非编辑器文件选项卡。点击侧栏图标即可切换显示/隐藏。</li>
+        <li><b>终端滚轮修复:</b> 修复了鼠标滚轮无法滚动浏览命令历史和终端输出的问题。现在滚轮事件（PageUp/PageDown）可正确转发，实现流畅浏览。</li>
+        <li><b>文件引用修复:</b> Ctrl+Alt+K 快捷键发送文件引用现在直接写入终端 TTY，不再依赖 HTTP API，兼容 opencode v1.15+。</li>
     </ul>
     <br>
-    <i>Forked by <a href="https://github.com/ZAXSCD717/OpenCode_UI_idea">ZAXSCD717</a>. Original work by <a href="https://github.com/LaiZhou/OpenCode_UI">LaiZhou</a>.</i>
+    <i>Based on <a href="https://github.com/LaiZhou/OpenCode_UI">LaiZhou/OpenCode_UI</a>.</i>
   ]]></description>
 
   <depends>com.intellij.modules.platform</depends>
@@ -34,8 +35,8 @@
   <actions>
     <action id="OpenCode.QuickLaunch"
             class="ai.opencode.ide.jetbrains.QuickLaunchAction"
-            text="Open OpenCode"
-            description="Open or focus the OpenCode terminal"
+            text="打开 OpenCode"
+            description="打开或聚焦 OpenCode 终端"
             icon="/icons/opencode.svg">
       <add-to-group group-id="ToolsMenu" anchor="first"/>
       <keyboard-shortcut keymap="$default" first-keystroke="control BACK_SLASH"/>
@@ -45,7 +46,7 @@
 
     <action id="OpenCode.AddLines"
             class="ai.opencode.ide.jetbrains.SendSelectionToTerminalAction"
-            text="Add lines to OpenCode Terminal"
+            text="发送到 OpenCode 终端"
             icon="/icons/opencode.svg">
       <add-to-group group-id="EditorPopupMenu" anchor="last"/>
       <keyboard-shortcut keymap="$default" first-keystroke="control alt K"/>
@@ -55,7 +56,7 @@
 
     <action id="OpenCode.AddFile"
             class="ai.opencode.ide.jetbrains.SendSelectionToTerminalAction"
-            text="Add to OpenCode Terminal"
+            text="发送到 OpenCode 终端"
             icon="/icons/opencode.svg">
       <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
       <keyboard-shortcut keymap="$default" first-keystroke="control alt K"/>
